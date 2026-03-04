@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: changeset-review-sensor
+  namespace: argo-events
+  labels:
+    app.kubernetes.io/part-of: night-city-agents
+spec:
+  template:
+    serviceAccountName: sensor-sa
+  dependencies:
+    - name: merge-request-event
+      eventSourceName: webhook-eventsource
+      eventName: merge-request
+
+  triggers:
+    - template:
+        name: changeset-review-trigger
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: changeset-review-
+                namespace: argo
+                labels:
+                  app.kubernetes.io/part-of: night-city-agents
+              spec:
+                workflowTemplateRef:
+                  name: changeset-review
+                arguments:
+                  parameters:
+                    - name: event-payload
+                      value: ""  # Overridden by parameters below
+          parameters:
+            - src:
+                dependencyName: merge-request-event
+                dataKey: body
+              dest: spec.arguments.parameters.0.value

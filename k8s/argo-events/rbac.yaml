@@ -1,0 +1,28 @@
+# ServiceAccount for Argo Events Sensor to submit workflows
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sensor-sa
+  namespace: argo-events
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sensor-workflow-submit
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["create", "get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sensor-workflow-submit-binding
+subjects:
+  - kind: ServiceAccount
+    name: sensor-sa
+    namespace: argo-events
+roleRef:
+  kind: ClusterRole
+  name: sensor-workflow-submit
+  apiGroup: rbac.authorization.k8s.io

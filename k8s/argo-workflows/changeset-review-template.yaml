@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: changeset-review
+  namespace: argo
+  labels:
+    app.kubernetes.io/part-of: night-city-agents
+  annotations:
+    workflows.argoproj.io/description: |
+      Night City Changeset Review Agent.
+      Analyzes a merge request diff using an LLM and posts
+      a structured review comment back to the GitLab API.
+spec:
+  entrypoint: review-pipeline
+  arguments:
+    parameters:
+      - name: event-payload
+        description: JSON-encoded MergeRequestEvent from the webhook
+
+  templates:
+    - name: review-pipeline
+      dag:
+        tasks:
+          - name: analyze-changeset
+            template: run-review-agent
+            arguments:
+              parameters:
+                - name: event-payload
+                  value: "{{workflow.parameters.event-payload}}"
+
+    - name: run-review-agent
+      inputs:
+        parameters:
+          - name: event-payload
+      container:
+        image: night-city-agents:latest
+        imagePullPolicy: Never  # Use local image (Docker Desktop)
+        command: ["node"]
+        args: ["dist/agent/review.js"]
+        env:
+          - name: EVENT_PAYLOAD
+            value: "{{inputs.parameters.event-payload}}"
+          - name: GITLAB_SIM_URL
+            value: "http://gitlab-sim.night-city.svc.cluster.local:3001"
+          - name: MODEL
+            value: "claude-sonnet-4-5-20250929"
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: agent-secrets
+                key: anthropic-api-key
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      activeDeadlineSeconds: 120
